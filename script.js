@@ -16,18 +16,30 @@ const photos = [
   { id: "photo-6", src: "assets/photos/photo-6.jpg", voice: "assets/voices/photo-6.mp3", caption: "One more memory for the night.", x: 202, y: 286, r: "-4deg" }
 ];
 
+const finalPhotos = [
+  { id: "final-photo-1", src: "assets/photos/photo-9.jpg", caption: "A final little picture I wanted here.", x: "clamp(-108px, -27vw, -82px)", y: "clamp(-136px, -22dvh, -102px)", r: "-9deg", z: 1 },
+  { id: "final-photo-2", src: "assets/photos/photo-8.jpg", caption: "This one belongs near the ending.", x: "clamp(112px, 34vw, 156px)", y: "clamp(-146px, -24dvh, -108px)", r: "8deg", z: 2 },
+  { id: "final-photo-4", src: "assets/photos/photo-10.jpg", caption: "Another reason this page feels warm.", x: "clamp(140px, 29vw, 122px)", y: "clamp(-42px, -6dvh, -24px)", r: "-7deg", z: 4 },
+  { id: "final-photo-5", src: "assets/photos/photo-11.jpg", caption: "A tiny piece of the story saved here.", x: "clamp(-250px, -27vw, -82px)", y: "clamp(92px, 17dvh, 126px)", r: "-4deg", z: 5 },
+  { id: "final-photo-6", src: "assets/photos/photo-12.jpg", caption: "One more photo for the letter.", x: "clamp(140px, 34vw, 154px)", y: "clamp(96px, 18dvh, 132px)", r: "5deg", z: 6 },
+  { id: "final-photo-7", src: "assets/photos/photo-13.jpg", caption: "A last memory peeking from the paper.", x: "clamp(-32px, -8vw, -18px)", y: "clamp(-174px, -28dvh, -126px)", r: "3deg", z: 1 },
+  { id: "final-photo-8", src: "assets/photos/photo-14.jpg", caption: "This one closes the envelope softly.", x: "clamp(0px, 4vw, 24px)", y: "clamp(134px, 24dvh, 168px)", r: "-3deg", z: 2 }
+];
+
 const videos = [
-  { id: "video-1", src: "assets/videos/video-1.mp4", poster: "assets/videos/video-1-poster.jpg", caption: "A moving little memory.", x: 116, y: 326, xRatio: 0.47, yRatio: 0.72, r: "-10deg", z: 12 },
-  { id: "video-2", src: "assets/videos/video-2.mp4", poster: "assets/videos/video-2-poster.jpg", caption: "Press play when you want to see it again.", x: 136, y: 88, xRatio: 0.34, yRatio: 0.05, r: "9deg", z: 4 }
+  { id: "video-1", src: "assets/videos/video-1.mp4", caption: "A moving little memory.", x: 116, y: 326, xRatio: 0.47, yRatio: 0.72, r: "-10deg", z: 12 },
+  { id: "video-2", src: "assets/videos/video-2.mp4", caption: "Press play when you want to see it again.", x: 136, y: 88, xRatio: 0.34, yRatio: 0.05, r: "9deg", z: 4 },
+  { id: "video-3", src: "assets/videos/video-3.mp4", caption: "Another little moving memory for this part.", r: "-2deg" },
+  { id: "video-4", src: "assets/videos/video-4.mp4", caption: "A soft moment saved for the story.", r: "2deg" }
 ];
 
 const storyCards = [
   { type: "photo", ref: "photo-1" },
   { type: "message", text: "Some memories are quiet, but they stay." },
-  { type: "video", ref: "video-1" },
+  { type: "video", ref: "video-3" },
   { type: "photo", ref: "photo-3" },
   { type: "message", text: "This page is just a small way to say I care." },
-  { type: "video", ref: "video-2" }
+  { type: "video", ref: "video-4" }
 ];
 
 const state = {
@@ -38,6 +50,7 @@ const state = {
   activeAudio: null,
   activeVideo: null,
   lastFocusedElement: null,
+  viewerTransitionDirection: null,
   letterPinned: localStorage.getItem("gf-letter-position") === "moved"
 };
 
@@ -49,6 +62,7 @@ const els = {
   openingBody: document.querySelector("#opening-letter-body"),
   storyCarousel: document.querySelector("#story-carousel"),
   mediaViewer: document.querySelector("#media-viewer"),
+  viewerCard: document.querySelector(".viewer-card"),
   viewerMedia: document.querySelector("#viewer-media"),
   viewerCaption: document.querySelector("#viewer-caption"),
   viewerPrev: document.querySelector("#viewer-prev"),
@@ -56,6 +70,7 @@ const els = {
   viewerToggle: document.querySelector("#viewer-toggle"),
   viewerReplay: document.querySelector("#viewer-replay"),
   finalEnvelope: document.querySelector("#final-envelope"),
+  finalPhotoStack: document.querySelector("#final-photo-stack"),
   finalLetter: document.querySelector("#final-letter"),
   finalTitle: document.querySelector("#final-letter-title"),
   finalBody: document.querySelector("#final-letter-body"),
@@ -73,6 +88,7 @@ function init() {
   els.finalBody.textContent = letterText.finalBody;
   renderMemoryBoard();
   renderStoryCarousel();
+  renderFinalPhotoStack();
   bindNavigation();
   bindOpeningLetter();
   bindViewer();
@@ -83,7 +99,7 @@ function init() {
 function renderMemoryBoard() {
   const boardItems = [
     ...photos.slice(0, 4).map((item) => ({ ...item, type: "photo" })),
-    ...videos.map((item) => ({ ...item, type: "video" }))
+    ...videos.slice(0, 2).map((item) => ({ ...item, type: "video" }))
   ];
 
   els.memoryBoard.innerHTML = "";
@@ -132,24 +148,65 @@ function renderStoryCarousel() {
   });
 }
 
+function renderFinalPhotoStack() {
+  els.finalPhotoStack.innerHTML = "";
+  finalPhotos.forEach((item, index) => {
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "final-photo-card";
+    card.dataset.id = item.id;
+    card.style.setProperty("--fx", item.x);
+    card.style.setProperty("--fy", item.y);
+    card.style.setProperty("--fr", item.r);
+    card.style.setProperty("--fz", item.z);
+
+    const image = document.createElement("img");
+    image.src = item.src;
+    image.alt = item.caption;
+    image.draggable = false;
+    image.addEventListener("error", () => {
+      image.replaceWith(createPlaceholder(`Photo ${index + 7}`));
+    });
+    card.appendChild(image);
+
+    card.addEventListener("click", () => {
+      openViewer(getFinalPhotoItems(), index, "screen-3-envelope");
+    });
+    els.finalPhotoStack.appendChild(card);
+  });
+}
+
 function appendCardMedia(card, item, type, index) {
-  const src = type === "video" ? item.poster : item.src;
   const label = type === "video" ? "Video memory" : `Photo ${index + 1}`;
 
-  const image = document.createElement("img");
-  image.src = src;
-  image.alt = label;
-  image.draggable = false;
-  image.addEventListener("error", () => {
-    image.replaceWith(createPlaceholder(label));
-  });
-  card.appendChild(image);
-
   if (type === "video") {
+    const preview = document.createElement("video");
+    preview.src = item.src;
+    preview.muted = true;
+    preview.playsInline = true;
+    preview.preload = "metadata";
+    preview.setAttribute("aria-label", label);
+    preview.addEventListener("loadedmetadata", () => {
+      preview.currentTime = Math.min(0.1, preview.duration || 0);
+    });
+    preview.addEventListener("error", () => {
+      preview.replaceWith(createPlaceholder(label));
+    });
+    card.appendChild(preview);
+
     const playBadge = document.createElement("span");
     playBadge.className = "play-badge";
     playBadge.textContent = "Play";
     card.appendChild(playBadge);
+  } else {
+    const image = document.createElement("img");
+    image.src = item.src;
+    image.alt = label;
+    image.draggable = false;
+    image.addEventListener("error", () => {
+      image.replaceWith(createPlaceholder(label));
+    });
+    card.appendChild(image);
   }
 
   const labelNode = document.createElement("span");
@@ -331,6 +388,9 @@ function bindViewer() {
   els.viewerNext.addEventListener("click", () => stepViewer(1));
   els.viewerToggle.addEventListener("click", toggleCurrentMedia);
   els.viewerReplay.addEventListener("click", replayCurrentMedia);
+  els.viewerCard.addEventListener("animationend", () => {
+    els.viewerCard.classList.remove("is-flipping-next", "is-flipping-prev");
+  });
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && els.mediaViewer.classList.contains("is-open")) {
       closeViewer();
@@ -355,9 +415,11 @@ function closeViewer() {
   els.mediaViewer.classList.remove("is-open");
   els.mediaViewer.setAttribute("aria-hidden", "true");
   els.viewerMedia.innerHTML = "";
+  els.viewerCard.classList.remove("is-flipping-next", "is-flipping-prev");
   state.viewerSource = null;
   state.viewerItems = [];
   state.viewerIndex = 0;
+  state.viewerTransitionDirection = null;
   stopAllMedia();
   if (wasOpen && state.lastFocusedElement && typeof state.lastFocusedElement.focus === "function") {
     state.lastFocusedElement.focus();
@@ -369,6 +431,7 @@ function renderViewer(autoplay) {
   stopAllMedia();
   const item = state.viewerItems[state.viewerIndex];
   if (!item) return;
+  els.viewerCard.classList.remove("is-flipping-next", "is-flipping-prev");
   els.viewerMedia.innerHTML = "";
   els.viewerCaption.textContent = item.caption || "";
   els.viewerPrev.hidden = state.viewerItems.length < 2;
@@ -386,7 +449,6 @@ function renderViewer(autoplay) {
   } else if (item.type === "video") {
     const video = document.createElement("video");
     video.src = item.src;
-    video.poster = item.poster;
     video.playsInline = true;
     video.preload = "metadata";
     video.addEventListener("error", () => {
@@ -405,6 +467,12 @@ function renderViewer(autoplay) {
     img.alt = item.caption;
     img.onerror = () => img.replaceWith(createPlaceholder("Photo placeholder"));
     els.viewerMedia.appendChild(img);
+    if (!item.voice) {
+      els.viewerToggle.textContent = "Photo";
+      els.viewerToggle.disabled = true;
+      els.viewerReplay.disabled = true;
+      return;
+    }
     const audio = new Audio(item.voice);
     audio.preload = "metadata";
     state.activeAudio = audio;
@@ -422,8 +490,13 @@ function renderViewer(autoplay) {
 
 function stepViewer(direction) {
   if (!state.viewerItems.length) return;
+  const shouldFlip = state.viewerSource === "screen-3-envelope";
+  state.viewerTransitionDirection = shouldFlip ? direction : null;
   state.viewerIndex = (state.viewerIndex + direction + state.viewerItems.length) % state.viewerItems.length;
   renderViewer(true);
+  if (shouldFlip) {
+    els.viewerCard.classList.add(direction > 0 ? "is-flipping-next" : "is-flipping-prev");
+  }
   syncStoryCarouselToViewer();
 }
 
@@ -515,7 +588,7 @@ function stopAllMedia(except = null) {
 function getBoardMediaItems() {
   return [
     ...photos.slice(0, 4).map((item) => ({ ...item, type: "photo" })),
-    ...videos.map((item) => ({ ...item, type: "video" }))
+    ...videos.slice(0, 2).map((item) => ({ ...item, type: "video" }))
   ];
 }
 
@@ -538,6 +611,10 @@ function getStoryMediaItems() {
 
 function getStoryMediaIndexByStoryIndex(storyIndex) {
   return getStoryMediaItems().findIndex((item) => item.storyIndex === storyIndex);
+}
+
+function getFinalPhotoItems() {
+  return finalPhotos.map((item) => ({ ...item, type: "photo" }));
 }
 
 function getMediaById(id) {
