@@ -37,6 +37,7 @@ const state = {
   viewerSource: null,
   activeAudio: null,
   activeVideo: null,
+  lastFocusedElement: null,
   letterPinned: localStorage.getItem("gf-letter-position") === "moved"
 };
 
@@ -95,7 +96,7 @@ function renderMemoryBoard() {
     card.dataset.type = item.type;
     card.style.setProperty("--r", item.r);
     card.style.setProperty("--z", item.z ?? 3);
-    card.innerHTML = cardMediaMarkup(item, item.type, index);
+    appendCardMedia(card, item, item.type, index);
     els.memoryBoard.appendChild(card);
     const fallback = getDefaultCardPosition(item, card);
     const initial = constrainToBoard(saved?.x ?? fallback.x, saved?.y ?? fallback.y, card);
@@ -116,12 +117,14 @@ function renderStoryCarousel() {
     node.dataset.storyIndex = index;
 
     if (card.type === "message") {
-      node.innerHTML = `<p>${card.text}</p>`;
+      const text = document.createElement("p");
+      text.textContent = card.text;
+      node.appendChild(text);
       node.addEventListener("click", () => openViewer(getStoryMediaItems(), getStoryMediaIndexByStoryIndex(index), "screen-2-carousel"));
     } else {
       const item = getMediaById(card.ref);
       node.dataset.id = item.id;
-      node.innerHTML = cardMediaMarkup(item, card.type, index);
+      appendCardMedia(node, item, card.type, index);
       node.addEventListener("click", () => openViewer(getStoryMediaItems(), getStoryMediaIndexByStoryIndex(index), "screen-2-carousel"));
     }
 
@@ -129,14 +132,30 @@ function renderStoryCarousel() {
   });
 }
 
-function cardMediaMarkup(item, type, index) {
+function appendCardMedia(card, item, type, index) {
   const src = type === "video" ? item.poster : item.src;
   const label = type === "video" ? "Video memory" : `Photo ${index + 1}`;
-  return `
-    <img src="${src}" alt="${label}" draggable="false" onerror="this.replaceWith(createPlaceholder('${label.replace(/'/g, "\\'")}'))">
-    ${type === "video" ? '<span class="play-badge">Play</span>' : ""}
-    <span class="card-label">${label}</span>
-  `;
+
+  const image = document.createElement("img");
+  image.src = src;
+  image.alt = label;
+  image.draggable = false;
+  image.addEventListener("error", () => {
+    image.replaceWith(createPlaceholder(label));
+  });
+  card.appendChild(image);
+
+  if (type === "video") {
+    const playBadge = document.createElement("span");
+    playBadge.className = "play-badge";
+    playBadge.textContent = "Play";
+    card.appendChild(playBadge);
+  }
+
+  const labelNode = document.createElement("span");
+  labelNode.className = "card-label";
+  labelNode.textContent = label;
+  card.appendChild(labelNode);
 }
 
 window.createPlaceholder = function createPlaceholder(label) {
@@ -271,18 +290,37 @@ function applyLetterState(animate) {
 }
 
 function bindNavigation() {
-  document.querySelector("#to-story").addEventListener("click", () => showScreen(2));
+  document.querySelector("#to-story").addEventListener("click", (event) => {
+    event.stopPropagation();
+    showScreen(2);
+  });
+
+  document.querySelector("#to-final")?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    showScreen(3);
+  });
+
   document.querySelectorAll("[data-go]").forEach((button) => {
-    button.addEventListener("click", () => showScreen(Number(button.dataset.go)));
+    if (button.id === "to-final") return;
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      showScreen(Number(button.dataset.go));
+    });
   });
 }
 
 function showScreen(screenNumber) {
+  if (screenNumber === 3) closeViewer();
+  if (state.currentScreen === 3 && screenNumber !== 3) resetFinalLetter();
   stopAllMedia();
   state.currentScreen = screenNumber;
   els.screens.forEach((screen) => {
     screen.classList.toggle("is-active", Number(screen.dataset.screen) === screenNumber);
   });
+
+  if (screenNumber === 3) {
+    document.querySelector("#screen-three").scrollTop = 0;
+  }
 }
 
 function bindViewer() {
@@ -293,9 +331,15 @@ function bindViewer() {
   els.viewerNext.addEventListener("click", () => stepViewer(1));
   els.viewerToggle.addEventListener("click", toggleCurrentMedia);
   els.viewerReplay.addEventListener("click", replayCurrentMedia);
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && els.mediaViewer.classList.contains("is-open")) {
+      closeViewer();
+    }
+  });
 }
 
 function openViewer(items, index, source = null) {
+  state.lastFocusedElement = document.activeElement;
   state.viewerItems = items;
   state.viewerIndex = Math.max(0, index);
   state.viewerSource = source;
@@ -303,14 +347,22 @@ function openViewer(items, index, source = null) {
   els.mediaViewer.setAttribute("aria-hidden", "false");
   renderViewer(true);
   syncStoryCarouselToViewer();
+  document.querySelector(".close-button")?.focus();
 }
 
 function closeViewer() {
+  const wasOpen = els.mediaViewer.classList.contains("is-open");
   els.mediaViewer.classList.remove("is-open");
   els.mediaViewer.setAttribute("aria-hidden", "true");
   els.viewerMedia.innerHTML = "";
   state.viewerSource = null;
+  state.viewerItems = [];
+  state.viewerIndex = 0;
   stopAllMedia();
+  if (wasOpen && state.lastFocusedElement && typeof state.lastFocusedElement.focus === "function") {
+    state.lastFocusedElement.focus();
+  }
+  state.lastFocusedElement = null;
 }
 
 function renderViewer(autoplay) {
@@ -358,7 +410,7 @@ function renderViewer(autoplay) {
     state.activeAudio = audio;
     els.viewerToggle.textContent = "Pause";
     audio.addEventListener("error", () => {
-      els.viewerToggle.textContent = "No voice";
+      els.viewerToggle.textContent = "Voice not added";
       els.viewerToggle.disabled = true;
       els.viewerReplay.disabled = true;
     });
@@ -428,7 +480,7 @@ function bindFinalLetter() {
   });
 
   finalAudio.addEventListener("error", () => {
-    els.finalAudioToggle.textContent = "No audio";
+    els.finalAudioToggle.textContent = "Voice not added";
     els.finalAudioToggle.disabled = true;
     els.finalAudioReplay.disabled = true;
   });
@@ -492,6 +544,14 @@ function getMediaById(id) {
   return photos.find((item) => item.id === id) || videos.find((item) => item.id === id);
 }
 
+function resetFinalLetter() {
+  const screenThree = document.querySelector("#screen-three");
+  screenThree.classList.remove("is-open");
+  els.finalLetter.classList.remove("is-open");
+  els.finalLetter.setAttribute("aria-hidden", "true");
+  els.finalEnvelope.setAttribute("aria-expanded", "false");
+}
+
 function syncStoryCarouselToViewer() {
   if (state.viewerSource !== "screen-2-carousel") return;
   const item = state.viewerItems[state.viewerIndex];
@@ -500,10 +560,10 @@ function syncStoryCarouselToViewer() {
   const targetCard = els.storyCarousel.querySelectorAll(".story-card")[item.storyIndex];
   if (!targetCard) return;
 
-  targetCard.scrollIntoView({
-    behavior: "smooth",
-    inline: "center",
-    block: "nearest"
+  const left = targetCard.offsetLeft - (els.storyCarousel.clientWidth / 2) + (targetCard.clientWidth / 2);
+  els.storyCarousel.scrollTo({
+    left: Math.max(0, left),
+    behavior: "smooth"
   });
 }
 
