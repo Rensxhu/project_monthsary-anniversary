@@ -1,10 +1,10 @@
 const letterText = {
   openingTitle: "Before you look around",
   openingBody:
-    "I made this little night page for you. Move this letter when you are ready, then tap the memories slowly.",
+    "I made this little monthsary page for you. Move this letter when you are ready, then tap the memories slowly .",
   finalTitle: "For when you reach the end",
   finalBody:
-    "This final letter is a placeholder for the words I want you to hear. Add the real message here when you are ready."
+    "Dear yeobo Happy monthsary, na malayo na ang narating natin  maraming pag subok na ating nilampasan. Unang una Pasensya na kung wala akong naibigay sayo na regalo kundi itong ginawa ko at itong mesahe  naway na nagustuhan mo ito. Alam mo na sa Bawat natin pag sasama lahat ay naeenjoy ko na kasama kita, Bawat oras, minuto segundo, at araw. Alam ko yun pagod at hirap mo sa kolehiyo nakikita ko yun. Bawat puyat sugat at pag titiis para makatipid  at luha na nararamdaman  mo nakikita ko. Pero nakikita ko yun sayo at tagumpay mo  at proud na proud ako na sayo na achieve mo yun gusto mo  na sulit ang mga pinag hirapan mo  at ngayon na mag aapat na taon kan sa kolehiyo  Gusto ko  na wag ikaw na sumuko at lumaban, mag pokus ka sa iyong  pangarap at andito ako para suportahan ka  kahit malayo man tayo sa isat isa  andito ako sa tabi mo nag paparamdam sayo. I miss you So much yeob  and I Love you so Much  you made me proud  I hope you find this message  be a motivational for you to pursue higher of you dream. Love rence "
 };
 
 const photos = [
@@ -51,6 +51,7 @@ const state = {
   activeVideo: null,
   lastFocusedElement: null,
   viewerTransitionDirection: null,
+  finalTextAutoScrollFrame: null,
   letterPinned: localStorage.getItem("gf-letter-position") === "moved"
 };
 
@@ -155,10 +156,7 @@ function renderFinalPhotoStack() {
     card.type = "button";
     card.className = "final-photo-card";
     card.dataset.id = item.id;
-    card.style.setProperty("--fx", item.x);
-    card.style.setProperty("--fy", item.y);
     card.style.setProperty("--fr", item.r);
-    card.style.setProperty("--fz", item.z);
 
     const image = document.createElement("img");
     image.src = item.src;
@@ -530,6 +528,7 @@ function bindFinalLetter() {
     state.activeAudio = finalAudio;
     playSafely(finalAudio, "Play");
     els.finalAudioToggle.textContent = "Pause";
+    startFinalTextAutoScroll();
   });
 
   els.finalAudioToggle.addEventListener("click", () => {
@@ -623,10 +622,45 @@ function getMediaById(id) {
 
 function resetFinalLetter() {
   const screenThree = document.querySelector("#screen-three");
+  stopFinalTextAutoScroll();
   screenThree.classList.remove("is-open");
   els.finalLetter.classList.remove("is-open");
   els.finalLetter.setAttribute("aria-hidden", "true");
   els.finalEnvelope.setAttribute("aria-expanded", "false");
+  els.finalLetter.scrollTop = 0;
+}
+
+function startFinalTextAutoScroll() {
+  stopFinalTextAutoScroll();
+  els.finalLetter.scrollTop = 0;
+
+  window.requestAnimationFrame(() => {
+    const maxScroll = els.finalLetter.scrollHeight - els.finalLetter.clientHeight;
+    if (maxScroll <= 0) return;
+
+    const duration = 3500;
+    const startTime = performance.now();
+
+    function step(now) {
+      const progress = Math.min((now - startTime) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      els.finalLetter.scrollTop = maxScroll * eased;
+
+      if (progress < 1) {
+        state.finalTextAutoScrollFrame = window.requestAnimationFrame(step);
+      } else {
+        state.finalTextAutoScrollFrame = null;
+      }
+    }
+
+    state.finalTextAutoScrollFrame = window.requestAnimationFrame(step);
+  });
+}
+
+function stopFinalTextAutoScroll() {
+  if (!state.finalTextAutoScrollFrame) return;
+  window.cancelAnimationFrame(state.finalTextAutoScrollFrame);
+  state.finalTextAutoScrollFrame = null;
 }
 
 function syncStoryCarouselToViewer() {
