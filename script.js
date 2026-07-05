@@ -52,6 +52,9 @@ const state = {
   lastFocusedElement: null,
   viewerTransitionDirection: null,
   finalTextAutoScrollFrame: null,
+  backgroundMusicStarted: false,
+  backgroundMusicPausedForVideo: false,
+  backgroundMusicFadeFrame: null,
   letterPinned: localStorage.getItem("gf-letter-position") === "moved"
 };
 
@@ -82,6 +85,11 @@ const els = {
 const finalAudio = new Audio("assets/audio/final-letter.mp3");
 finalAudio.preload = "metadata";
 
+const backgroundMusic = new Audio("assets/audio/background.mp3");
+backgroundMusic.loop = true;
+backgroundMusic.preload = "metadata";
+backgroundMusic.volume = 0.35;
+
 function init() {
   els.openingTitle.textContent = letterText.openingTitle;
   els.openingBody.textContent = letterText.openingBody;
@@ -94,6 +102,7 @@ function init() {
   bindOpeningLetter();
   bindViewer();
   bindFinalLetter();
+  bindBackgroundMusicStart();
   applyLetterState(false);
 }
 
@@ -368,6 +377,7 @@ function showScreen(screenNumber) {
   if (screenNumber === 3) closeViewer();
   if (state.currentScreen === 3 && screenNumber !== 3) resetFinalLetter();
   stopAllMedia();
+  resumeBackgroundMusic();
   state.currentScreen = screenNumber;
   els.screens.forEach((screen) => {
     screen.classList.toggle("is-active", Number(screen.dataset.screen) === screenNumber);
@@ -396,6 +406,63 @@ function bindViewer() {
   });
 }
 
+function bindBackgroundMusicStart() {
+  document.addEventListener("pointerdown", startBackgroundMusic, { once: true });
+}
+
+function startBackgroundMusic() {
+  if (state.backgroundMusicStarted) return;
+  state.backgroundMusicStarted = true;
+  backgroundMusic.volume = 0.35;
+  playSafely(backgroundMusic, "");
+}
+
+function fadeBackgroundMusic(targetVolume, duration = 450) {
+  if (!state.backgroundMusicStarted || backgroundMusic.error) return;
+  window.cancelAnimationFrame(state.backgroundMusicFadeFrame);
+
+  const startVolume = backgroundMusic.volume;
+  const startTime = performance.now();
+
+  function step(now) {
+    const progress = Math.min((now - startTime) / duration, 1);
+    backgroundMusic.volume = startVolume + ((targetVolume - startVolume) * progress);
+
+    if (progress < 1) {
+      state.backgroundMusicFadeFrame = window.requestAnimationFrame(step);
+    } else {
+      state.backgroundMusicFadeFrame = null;
+    }
+  }
+
+  state.backgroundMusicFadeFrame = window.requestAnimationFrame(step);
+}
+
+function duckBackgroundMusic() {
+  if (state.backgroundMusicPausedForVideo) return;
+  if (state.backgroundMusicStarted && backgroundMusic.paused) {
+    playSafely(backgroundMusic, "");
+  }
+  fadeBackgroundMusic(0.08);
+}
+
+function pauseBackgroundMusicForVideo() {
+  if (!state.backgroundMusicStarted) return;
+  window.cancelAnimationFrame(state.backgroundMusicFadeFrame);
+  state.backgroundMusicFadeFrame = null;
+  state.backgroundMusicPausedForVideo = true;
+  backgroundMusic.pause();
+}
+
+function resumeBackgroundMusic() {
+  if (!state.backgroundMusicStarted) return;
+  state.backgroundMusicPausedForVideo = false;
+  if (backgroundMusic.paused) {
+    playSafely(backgroundMusic, "");
+  }
+  fadeBackgroundMusic(0.35);
+}
+
 function openViewer(items, index, source = null) {
   state.lastFocusedElement = document.activeElement;
   state.viewerItems = items;
@@ -410,6 +477,7 @@ function openViewer(items, index, source = null) {
 
 function closeViewer() {
   const wasOpen = els.mediaViewer.classList.contains("is-open");
+  const keepFinalAudio = state.viewerSource === "screen-3-envelope";
   els.mediaViewer.classList.remove("is-open");
   els.mediaViewer.setAttribute("aria-hidden", "true");
   els.viewerMedia.innerHTML = "";
@@ -418,7 +486,12 @@ function closeViewer() {
   state.viewerItems = [];
   state.viewerIndex = 0;
   state.viewerTransitionDirection = null;
-  stopAllMedia();
+  stopAllMedia(keepFinalAudio ? finalAudio : null);
+  if (keepFinalAudio && !finalAudio.paused) {
+    duckBackgroundMusic();
+  } else {
+    resumeBackgroundMusic();
+  }
   if (wasOpen && state.lastFocusedElement && typeof state.lastFocusedElement.focus === "function") {
     state.lastFocusedElement.focus();
   }
@@ -426,9 +499,10 @@ function closeViewer() {
 }
 
 function renderViewer(autoplay) {
-  stopAllMedia();
   const item = state.viewerItems[state.viewerIndex];
   if (!item) return;
+  const keepFinalAudio = state.viewerSource === "screen-3-envelope";
+  stopAllMedia(keepFinalAudio ? finalAudio : null);
   els.viewerCard.classList.remove("is-flipping-next", "is-flipping-prev");
   els.viewerMedia.innerHTML = "";
   els.viewerCaption.textContent = item.caption || "";
@@ -436,6 +510,7 @@ function renderViewer(autoplay) {
   els.viewerNext.hidden = state.viewerItems.length < 2;
 
   if (item.type === "message") {
+    resumeBackgroundMusic();
     const message = document.createElement("div");
     message.className = "viewer-message";
     message.textContent = item.text;
@@ -445,6 +520,7 @@ function renderViewer(autoplay) {
     els.viewerToggle.disabled = true;
     els.viewerReplay.disabled = true;
   } else if (item.type === "video") {
+    pauseBackgroundMusicForVideo();
     const video = document.createElement("video");
     video.src = item.src;
     video.playsInline = true;
@@ -452,12 +528,14 @@ function renderViewer(autoplay) {
     video.addEventListener("error", () => {
       els.viewerMedia.innerHTML = "";
       els.viewerMedia.appendChild(createPlaceholder("Video placeholder"));
+      resumeBackgroundMusic();
     });
     els.viewerMedia.appendChild(video);
     state.activeVideo = video;
     els.viewerToggle.disabled = false;
     els.viewerReplay.disabled = false;
     els.viewerToggle.textContent = "Pause";
+    video.addEventListener("ended", resumeBackgroundMusic);
     if (autoplay) playSafely(video, "Play");
   } else {
     const img = document.createElement("img");
@@ -466,6 +544,11 @@ function renderViewer(autoplay) {
     img.onerror = () => img.replaceWith(createPlaceholder("Photo placeholder"));
     els.viewerMedia.appendChild(img);
     if (!item.voice) {
+      if (keepFinalAudio && !finalAudio.paused) {
+        duckBackgroundMusic();
+      } else {
+        resumeBackgroundMusic();
+      }
       els.viewerToggle.textContent = "Photo";
       els.viewerToggle.disabled = true;
       els.viewerReplay.disabled = true;
@@ -479,9 +562,12 @@ function renderViewer(autoplay) {
       els.viewerToggle.textContent = "Voice not added";
       els.viewerToggle.disabled = true;
       els.viewerReplay.disabled = true;
+      resumeBackgroundMusic();
     });
+    audio.addEventListener("ended", resumeBackgroundMusic);
     els.viewerToggle.disabled = false;
     els.viewerReplay.disabled = false;
+    duckBackgroundMusic();
     if (autoplay) playSafely(audio, "Play");
   }
 }
@@ -502,10 +588,16 @@ function toggleCurrentMedia() {
   const media = state.activeVideo || state.activeAudio;
   if (!media) return;
   if (media.paused) {
+    if (media === state.activeVideo) {
+      pauseBackgroundMusicForVideo();
+    } else {
+      duckBackgroundMusic();
+    }
     playSafely(media, "Play");
     els.viewerToggle.textContent = "Pause";
   } else {
     media.pause();
+    resumeBackgroundMusic();
     els.viewerToggle.textContent = "Play";
   }
 }
@@ -514,6 +606,11 @@ function replayCurrentMedia() {
   const media = state.activeVideo || state.activeAudio;
   if (!media) return;
   media.currentTime = 0;
+  if (media === state.activeVideo) {
+    pauseBackgroundMusicForVideo();
+  } else {
+    duckBackgroundMusic();
+  }
   playSafely(media, "Play");
   els.viewerToggle.textContent = "Pause";
 }
@@ -526,6 +623,7 @@ function bindFinalLetter() {
     els.finalEnvelope.setAttribute("aria-expanded", "true");
     stopAllMedia(finalAudio);
     state.activeAudio = finalAudio;
+    duckBackgroundMusic();
     playSafely(finalAudio, "Play");
     els.finalAudioToggle.textContent = "Pause";
     startFinalTextAutoScroll();
@@ -535,10 +633,12 @@ function bindFinalLetter() {
     stopAllMedia(finalAudio);
     state.activeAudio = finalAudio;
     if (finalAudio.paused) {
+      duckBackgroundMusic();
       playSafely(finalAudio, "Play");
       els.finalAudioToggle.textContent = "Pause";
     } else {
       finalAudio.pause();
+      resumeBackgroundMusic();
       els.finalAudioToggle.textContent = "Play";
     }
   });
@@ -547,14 +647,18 @@ function bindFinalLetter() {
     stopAllMedia(finalAudio);
     state.activeAudio = finalAudio;
     finalAudio.currentTime = 0;
+    duckBackgroundMusic();
     playSafely(finalAudio, "Play");
     els.finalAudioToggle.textContent = "Pause";
   });
+
+  finalAudio.addEventListener("ended", resumeBackgroundMusic);
 
   finalAudio.addEventListener("error", () => {
     els.finalAudioToggle.textContent = "Voice not added";
     els.finalAudioToggle.disabled = true;
     els.finalAudioReplay.disabled = true;
+    resumeBackgroundMusic();
   });
 }
 
@@ -564,8 +668,10 @@ function playSafely(media, fallbackText) {
     result.catch(() => {
       if (media === finalAudio) {
         els.finalAudioToggle.textContent = fallbackText;
-      } else {
+        resumeBackgroundMusic();
+      } else if (media !== backgroundMusic) {
         els.viewerToggle.textContent = fallbackText;
+        resumeBackgroundMusic();
       }
     });
   }
@@ -638,7 +744,7 @@ function startFinalTextAutoScroll() {
     const maxScroll = els.finalLetter.scrollHeight - els.finalLetter.clientHeight;
     if (maxScroll <= 0) return;
 
-    const duration = 3500;
+    const duration = 105000;
     const startTime = performance.now();
 
     function step(now) {
