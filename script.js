@@ -13,7 +13,7 @@ const photos = [
   { id: "photo-3", src: "assets/photos/photo-3.jpg", caption: "A small piece of my favorite story.", x: 32, y: 446, xRatio: 0.08, yRatio: 0.66, r: "6deg", z: 5 },
   { id: "photo-4", src: "assets/photos/photo-4.jpg", caption: "I hope this makes you pause and smile.", x: 218, y: 430, xRatio: 0.62, yRatio: 0.58, r: "-6deg", z: 11 },
   { id: "photo-5", src: "assets/photos/photo-5.jpg", caption: "dal farm pampanga outing with you and my family", x: 50, y: 246, r: "3deg" },
-  { id: "photo-6", src: "assets/photos/photo-6.jpg", caption: "wannabe gengen yarn", x: 202, y: 286, r: "-4deg" },
+  { id: "photo-6", src: "assets/photos/photo-6.jpg", caption: "our picture in dal's farm", x: 202, y: 286, r: "-4deg" },
   { id: "photo-16", src: "assets/photos/photo-16.jpg", caption: "our manaoag date❤️", x: 180, y: 260, r: "2deg" }
 ];
 
@@ -28,8 +28,8 @@ const finalPhotos = [
 ];
 
 const videos = [
-  { id: "video-1", src: "assets/videos/video-1.mp4", caption: "A moving little memory.", x: 116, y: 326, xRatio: 0.47, yRatio: 0.72, r: "-10deg", z: 12 },
-  { id: "video-2", src: "assets/videos/video-2.mp4", caption: "Press play when you want to see it again.", x: 136, y: 88, xRatio: 0.34, yRatio: 0.05, r: "9deg", z: 4 },
+  { id: "video-1", src: "assets/videos/video-1.mp4", caption: "bardagulan natin HAHAHA", x: 116, y: 326, xRatio: 0.47, yRatio: 0.72, r: "-10deg", z: 12 },
+  { id: "video-2", src: "assets/videos/video-2.mp4", caption: "wanabe gengeng ako HAHAHAHAH.", x: 136, y: 88, xRatio: 0.34, yRatio: 0.05, r: "9deg", z: 4 },
   { id: "video-3", src: "assets/videos/video-3.mp4", caption: "street ihaw date natin walang budget.", r: "-2deg" },
   { id: "video-4", src: "assets/videos/video-4.mp4", caption: " first time ko mag biyahe pa baymabang para samahan ka hehehehe.", r: "2deg" }
 ];
