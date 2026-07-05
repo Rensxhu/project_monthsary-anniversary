@@ -8,12 +8,13 @@ const letterText = {
 };
 
 const photos = [
-  { id: "photo-1", src: "assets/photos/photo-1.jpg", voice: "assets/voices/photo-1.mp3", caption: "A tiny memory I kept close.", x: 18, y: 172, xRatio: 0.02, yRatio: 0.34, r: "-8deg", z: 11 },
-  { id: "photo-2", src: "assets/photos/photo-2.jpg", voice: "assets/voices/photo-2.mp3", caption: "This one feels like a quiet smile.", x: 214, y: 154, xRatio: 0.66, yRatio: 0.18, r: "7deg", z: 5 },
-  { id: "photo-3", src: "assets/photos/photo-3.jpg", voice: "assets/voices/photo-3.mp3", caption: "A small piece of my favorite story.", x: 32, y: 446, xRatio: 0.08, yRatio: 0.66, r: "6deg", z: 5 },
-  { id: "photo-4", src: "assets/photos/photo-4.jpg", voice: "assets/voices/photo-4.mp3", caption: "I hope this makes you pause and smile.", x: 218, y: 430, xRatio: 0.62, yRatio: 0.58, r: "-6deg", z: 11 },
-  { id: "photo-5", src: "assets/photos/photo-5.jpg", voice: "assets/voices/photo-5.mp3", caption: "Another reason I wanted to make this.", x: 50, y: 246, r: "3deg" },
-  { id: "photo-6", src: "assets/photos/photo-6.jpg", voice: "assets/voices/photo-6.mp3", caption: "One more memory for the night.", x: 202, y: 286, r: "-4deg" }
+  { id: "photo-1", src: "assets/photos/photo-1.jpg", caption: "ito yun time na nag manila tayo para sa birthday ni lanlan😊.", x: 18, y: 172, xRatio: 0.02, yRatio: 0.34, r: "-8deg", z: 11 },
+  { id: "photo-2", src: "assets/photos/photo-2.jpg", caption: "Our manila date with you relatives😊", x: 214, y: 154, xRatio: 0.66, yRatio: 0.18, r: "7deg", z: 5 },
+  { id: "photo-3", src: "assets/photos/photo-3.jpg", caption: "A small piece of my favorite story.", x: 32, y: 446, xRatio: 0.08, yRatio: 0.66, r: "6deg", z: 5 },
+  { id: "photo-4", src: "assets/photos/photo-4.jpg", caption: "I hope this makes you pause and smile.", x: 218, y: 430, xRatio: 0.62, yRatio: 0.58, r: "-6deg", z: 11 },
+  { id: "photo-5", src: "assets/photos/photo-5.jpg", caption: "dal farm pampanga outing with you and my family", x: 50, y: 246, r: "3deg" },
+  { id: "photo-6", src: "assets/photos/photo-6.jpg", caption: "wannabe gengen yarn", x: 202, y: 286, r: "-4deg" },
+  { id: "photo-16", src: "assets/photos/photo-16.jpg", caption: "our manaoag date❤️", x: 180, y: 260, r: "2deg" }
 ];
 
 const finalPhotos = [
@@ -29,16 +30,16 @@ const finalPhotos = [
 const videos = [
   { id: "video-1", src: "assets/videos/video-1.mp4", caption: "A moving little memory.", x: 116, y: 326, xRatio: 0.47, yRatio: 0.72, r: "-10deg", z: 12 },
   { id: "video-2", src: "assets/videos/video-2.mp4", caption: "Press play when you want to see it again.", x: 136, y: 88, xRatio: 0.34, yRatio: 0.05, r: "9deg", z: 4 },
-  { id: "video-3", src: "assets/videos/video-3.mp4", caption: "Another little moving memory for this part.", r: "-2deg" },
-  { id: "video-4", src: "assets/videos/video-4.mp4", caption: "A soft moment saved for the story.", r: "2deg" }
+  { id: "video-3", src: "assets/videos/video-3.mp4", caption: "street ihaw date natin walang budget.", r: "-2deg" },
+  { id: "video-4", src: "assets/videos/video-4.mp4", caption: " first time ko mag biyahe pa baymabang para samahan ka hehehehe.", r: "2deg" }
 ];
 
 const storyCards = [
-  { type: "photo", ref: "photo-1" },
+  { type: "photo", ref: "photo-5" },
   { type: "message", text: "Some memories are quiet, but they stay." },
   { type: "video", ref: "video-3" },
-  { type: "photo", ref: "photo-3" },
-  { type: "message", text: "This page is just a small way to say I care." },
+  { type: "photo", ref: "photo-16" },
+  { type: "message", text: "This page is to show my love and care for you wether you're down and happy" },
   { type: "video", ref: "video-4" }
 ];
 
@@ -49,6 +50,7 @@ const state = {
   viewerSource: null,
   activeAudio: null,
   activeVideo: null,
+  activeVideoKeepsBackgroundMusic: false,
   lastFocusedElement: null,
   viewerTransitionDirection: null,
   finalTextAutoScrollFrame: null,
@@ -520,9 +522,15 @@ function renderViewer(autoplay) {
     els.viewerToggle.disabled = true;
     els.viewerReplay.disabled = true;
   } else if (item.type === "video") {
-    pauseBackgroundMusicForVideo();
+    const keepBackgroundMusic = state.viewerSource === "screen-2-carousel" && item.id === "video-3";
+    if (keepBackgroundMusic) {
+      resumeBackgroundMusic();
+    } else {
+      pauseBackgroundMusicForVideo();
+    }
     const video = document.createElement("video");
     video.src = item.src;
+    video.muted = keepBackgroundMusic;
     video.playsInline = true;
     video.preload = "metadata";
     video.addEventListener("error", () => {
@@ -532,6 +540,7 @@ function renderViewer(autoplay) {
     });
     els.viewerMedia.appendChild(video);
     state.activeVideo = video;
+    state.activeVideoKeepsBackgroundMusic = keepBackgroundMusic;
     els.viewerToggle.disabled = false;
     els.viewerReplay.disabled = false;
     els.viewerToggle.textContent = "Pause";
@@ -543,32 +552,14 @@ function renderViewer(autoplay) {
     img.alt = item.caption;
     img.onerror = () => img.replaceWith(createPlaceholder("Photo placeholder"));
     els.viewerMedia.appendChild(img);
-    if (!item.voice) {
-      if (keepFinalAudio && !finalAudio.paused) {
-        duckBackgroundMusic();
-      } else {
-        resumeBackgroundMusic();
-      }
-      els.viewerToggle.textContent = "Photo";
-      els.viewerToggle.disabled = true;
-      els.viewerReplay.disabled = true;
-      return;
-    }
-    const audio = new Audio(item.voice);
-    audio.preload = "metadata";
-    state.activeAudio = audio;
-    els.viewerToggle.textContent = "Pause";
-    audio.addEventListener("error", () => {
-      els.viewerToggle.textContent = "Voice not added";
-      els.viewerToggle.disabled = true;
-      els.viewerReplay.disabled = true;
+    if (keepFinalAudio && !finalAudio.paused) {
+      duckBackgroundMusic();
+    } else {
       resumeBackgroundMusic();
-    });
-    audio.addEventListener("ended", resumeBackgroundMusic);
-    els.viewerToggle.disabled = false;
-    els.viewerReplay.disabled = false;
-    duckBackgroundMusic();
-    if (autoplay) playSafely(audio, "Play");
+    }
+    els.viewerToggle.textContent = "Photo";
+    els.viewerToggle.disabled = true;
+    els.viewerReplay.disabled = true;
   }
 }
 
@@ -589,7 +580,11 @@ function toggleCurrentMedia() {
   if (!media) return;
   if (media.paused) {
     if (media === state.activeVideo) {
-      pauseBackgroundMusicForVideo();
+      if (state.activeVideoKeepsBackgroundMusic) {
+        resumeBackgroundMusic();
+      } else {
+        pauseBackgroundMusicForVideo();
+      }
     } else {
       duckBackgroundMusic();
     }
@@ -607,7 +602,11 @@ function replayCurrentMedia() {
   if (!media) return;
   media.currentTime = 0;
   if (media === state.activeVideo) {
-    pauseBackgroundMusicForVideo();
+    if (state.activeVideoKeepsBackgroundMusic) {
+      resumeBackgroundMusic();
+    } else {
+      pauseBackgroundMusicForVideo();
+    }
   } else {
     duckBackgroundMusic();
   }
@@ -685,7 +684,10 @@ function stopAllMedia(except = null) {
     }
   });
   if (state.activeAudio !== except) state.activeAudio = null;
-  if (state.activeVideo !== except) state.activeVideo = null;
+  if (state.activeVideo !== except) {
+    state.activeVideo = null;
+    state.activeVideoKeepsBackgroundMusic = false;
+  }
   els.viewerToggle.textContent = "Play";
   els.finalAudioToggle.textContent = finalAudio.paused ? "Play" : "Pause";
 }
